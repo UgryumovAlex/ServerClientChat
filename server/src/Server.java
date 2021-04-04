@@ -13,27 +13,53 @@ public class Server {
 
         try {
             server = new ServerSocket(8189);
-            System.out.println("Server started.");
+            System.out.println("Сервер запущен.");
 
             client = server.accept();
 
             in = new BufferedReader(new InputStreamReader(client.getInputStream()));
             out = new BufferedWriter(new OutputStreamWriter(client.getOutputStream()));
 
-            while (true) {
+            //Переводим ввод данных в консоль в отдельный поток
+            Thread consoleInput = new Thread(()->{
+                try {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+                    System.out.println("Введите сообщение : ");
+
+                    while( true ) {
+                        String serverMessage = reader.readLine();
+                        if (!client.isClosed()) {
+                            out.write(serverMessage + "\n");
+                            out.flush();
+                        } else {
+                            break;
+                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            consoleInput.setDaemon(true);
+            consoleInput.start();
+
+            //В основном потоке слушаем клиента
+            while( !client.isClosed() ) {
 
                 String clientMessage = in.readLine();
-                System.out.println("Client : " + clientMessage);
+                if (clientMessage != null) {
+                    System.out.println("Клиент : " + clientMessage);
 
-                if (clientMessage.equalsIgnoreCase("exit")) {
-                    out.write("Server echo : " + clientMessage + ". Bye!\n");
-                    out.flush();
+                    if (clientMessage.equalsIgnoreCase("exit")) {
+                        //Если клиент прислал "exit", то отправляем эхом обратно.
+                        //При приходе "exit" от сервера, клиент отключается
+                        out.write(clientMessage + "\n");
+                        out.flush();
+                    }
+                } else {
                     break;
                 }
-
-                out.write("Server echo : " + clientMessage + "\n");
-                out.flush();
             }
+
         } catch (IOException e) {
                 e.printStackTrace();
 
@@ -42,6 +68,7 @@ public class Server {
             out.close();
             client.close();
             server.close();
+            System.out.println("Сервер был остановлен...");
         }
     }
 }

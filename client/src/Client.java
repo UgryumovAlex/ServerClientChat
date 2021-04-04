@@ -4,47 +4,63 @@ import java.net.Socket;
 public class Client {
 
     private static Socket clientSocket;
-    //private static BufferedReader reader;
     private static BufferedReader in;
     private static BufferedWriter out;
 
-    public static void main(String[] args) {
+    public static void main(String[] args)  throws IOException {
         try {
-            try {
-                clientSocket = new Socket("localhost", 8189);
+              clientSocket = new Socket("localhost", 8189);
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+              in  = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+              out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 
-                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+              //Переводим ввод данных в консоль в отдельный поток
+              Thread consoleInput = new Thread(()->{
+                    try {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+                        System.out.println("Введите сообщение : ");
 
-                //Пробуем перенести ввод данных в консоль в отдельный поток
+                        while( true ) {
+                            String clientMessage = reader.readLine();
+                            if (!clientSocket.isClosed()) {
+                                out.write(clientMessage + "\n");
+                                out.flush();
 
+                            } else {
+                                break;
+                            }
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+              consoleInput.setDaemon(true);
+              consoleInput.start();
 
-                while (true) {
-                    System.out.println("Сообщение на сервер:");
+              //В основном потоке слушаем сервер
+              while ( !clientSocket.isClosed() ) {
 
-                    String clientMessage = reader.readLine(); // ждём пока соощение пишем в консоль
-                    out.write(clientMessage + "\n"); // отправляем сообщение на сервер
-                    out.flush();
+                    String serverMessage = in.readLine();
+                    if (serverMessage != null) {
+                        System.out.println("Сервер : " + serverMessage);
 
-                    String serverMessage = in.readLine(); // ждём, что скажет сервер
-                    System.out.println(serverMessage); // получив - выводим на экран
-
-                    if (clientMessage.equalsIgnoreCase("exit")) {
+                        if (serverMessage.equalsIgnoreCase("exit")) {
+                            //При приходе от сервера "exit", отключаемся
+                            break;
+                        }
+                    } else {
                         break;
                     }
                 }
 
-            } finally { // в любом случае необходимо закрыть сокет и потоки
-                System.out.println("Клиент был закрыт...");
-                clientSocket.close();
-                in.close();
-                out.close();
-            }
         } catch (IOException e) {
-            System.err.println(e);
-        }
+            e.printStackTrace();
 
+        } finally {
+            in.close();
+            out.close();
+            clientSocket.close();
+            System.out.println("Клиент был закрыт...");
+        }
     }
 }

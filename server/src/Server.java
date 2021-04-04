@@ -21,7 +21,7 @@ public class Server {
             out = new BufferedWriter(new OutputStreamWriter(client.getOutputStream()));
 
             //Переводим ввод данных в консоль в отдельный поток
-            new Thread(()->{
+            Thread consoleInput = new Thread(()->{
                 try {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
                     System.out.println("Введите сообщение : ");
@@ -31,10 +31,6 @@ public class Server {
                         if (!client.isClosed()) {
                             out.write(serverMessage + "\n");
                             out.flush();
-
-                            if (serverMessage.equalsIgnoreCase("exit")) {
-                                break;
-                            }
                         } else {
                             break;
                         }
@@ -42,9 +38,11 @@ public class Server {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }).start();
+            });
+            consoleInput.setDaemon(true);
+            consoleInput.start();
 
-            //В основном потоке случаем клиента
+            //В основном потоке слушаем клиента
             while( !client.isClosed() ) {
 
                 String clientMessage = in.readLine();
@@ -52,15 +50,16 @@ public class Server {
                     System.out.println("Клиент : " + clientMessage);
 
                     if (clientMessage.equalsIgnoreCase("exit")) {
+                        //Если клиент прислал "exit", то отправляем эхом обратно.
+                        //При приходе "exit" от сервера, клиент отключается
                         out.write(clientMessage + "\n");
                         out.flush();
-
                     }
-
                 } else {
                     break;
                 }
             }
+
         } catch (IOException e) {
                 e.printStackTrace();
 

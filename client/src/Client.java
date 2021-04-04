@@ -1,19 +1,21 @@
 import java.io.*;
 import java.net.Socket;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class Client {
 
-    public static void main(String[] args) {
+    private static Socket clientSocket;
+    private static BufferedReader in;
+    private static BufferedWriter out;
+
+    public static void main(String[] args)  throws IOException {
         try {
-            Socket clientSocket = new Socket("localhost", 8189);
+              clientSocket = new Socket("localhost", 8189);
 
-            BufferedReader in  = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+              in  = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+              out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 
-            try {
-                //Переводим ввод данных в консоль в отдельный поток
-                new Thread(()->{
+              //Переводим ввод данных в консоль в отдельный поток
+              Thread consoleInput = new Thread(()->{
                     try {
                         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
                         System.out.println("Введите сообщение : ");
@@ -24,13 +26,6 @@ public class Client {
                                 out.write(clientMessage + "\n");
                                 out.flush();
 
-                                if (clientMessage.equalsIgnoreCase("exit")) {
-                                    in.close();
-                                    out.close();
-                                    clientSocket.close();
-
-                                    break;
-                                }
                             } else {
                                 break;
                             }
@@ -38,16 +33,19 @@ public class Client {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                }).start();
+                });
+              consoleInput.setDaemon(true);
+              consoleInput.start();
 
-                //В основном потоке слушаем сервер
-                while ( !clientSocket.isClosed() ) {
+              //В основном потоке слушаем сервер
+              while ( !clientSocket.isClosed() ) {
 
                     String serverMessage = in.readLine();
                     if (serverMessage != null) {
                         System.out.println("Сервер : " + serverMessage);
 
                         if (serverMessage.equalsIgnoreCase("exit")) {
+                            //При приходе от сервера "exit", отключаемся
                             break;
                         }
                     } else {
@@ -55,15 +53,14 @@ public class Client {
                     }
                 }
 
-            } finally {
-                System.out.println("Клиент был закрыт...");
-                clientSocket.close();
-                in.close();
-                out.close();
-            }
         } catch (IOException e) {
-            System.err.println(e);
-        }
+            e.printStackTrace();
 
+        } finally {
+            in.close();
+            out.close();
+            clientSocket.close();
+            System.out.println("Клиент был закрыт...");
+        }
     }
 }
